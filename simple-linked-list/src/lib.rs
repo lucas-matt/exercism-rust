@@ -10,12 +10,30 @@ pub struct SimpleLinkedList<T> {
 }
 
 impl<T> Node<T> {
+
     fn len(&self) -> usize {
         match &self.next {
             Some(n) => 1 + n.len(),
             None => 1
         }
     }
+
+    fn unwind(mut self) -> Vec<T> {
+        let mut vec = self.next.take().map_or(vec!(), |next| next.unwind());
+        vec.push(self.data);
+        vec
+    }
+
+    fn rev(self, mut lst:SimpleLinkedList<T>) -> SimpleLinkedList<T> {
+        lst.push(self.data);
+        match self.next {
+            Some(next) => {
+                next.rev(lst)
+            },
+            _ => lst
+        }
+    }
+
 }
 
 impl<T> SimpleLinkedList<T> {
@@ -36,33 +54,41 @@ impl<T> SimpleLinkedList<T> {
     }
 
     pub fn len(&self) -> usize {
-        match &self.head {
-            Some(n) => n.len(),
-            None => 0
-        }
+        self.head.as_ref().map_or(0, |n| n.len())
     }
 
     pub fn push(&mut self, _element: T) {
-        unimplemented!()
+        let next = &mut self.head;
+        self.head = Some(Box::new(Node {
+            data: _element,
+            next: next.take()
+        }))
     }
 
     pub fn pop(&mut self) -> Option<T> {
-        unimplemented!()
+        self.head.take().map(|node| {
+            self.head = node.next;
+            node.data
+        })
     }
 
     pub fn peek(&self) -> Option<&T> {
-        unimplemented!()
+        self.head.as_ref().map(|node| &node.data)
     }
 
     pub fn rev(self) -> SimpleLinkedList<T> {
-        unimplemented!()
+        self.head.map_or(SimpleLinkedList::new(), |head| head.rev(SimpleLinkedList::new()))
     }
 
 }
 
 impl<T> FromIterator<T> for SimpleLinkedList<T> {
     fn from_iter<I: IntoIterator<Item = T>>(_iter: I) -> Self {
-        unimplemented!()
+        let mut list = SimpleLinkedList::new();
+        for i in _iter {
+            list.push(i)
+        }
+        list
     }
 }
 
@@ -79,6 +105,8 @@ impl<T> FromIterator<T> for SimpleLinkedList<T> {
 
 impl<T> Into<Vec<T>> for SimpleLinkedList<T> {
     fn into(self) -> Vec<T> {
-        unimplemented!()
+        self.head.map_or(vec!(), |node| node.unwind())
     }
 }
+
+
