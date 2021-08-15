@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{BTreeMap, BTreeSet};
 
 // This annotation prevents Clippy from warning us that `School` has a
 // `fn new()` with no arguments, but doesn't implement the `Default` trait.
@@ -8,30 +8,25 @@ use std::collections::HashMap;
 // of this exercise.
 #[allow(clippy::new_without_default)]
 pub struct School {
-    grades: HashMap<u32, Vec<String>>
+    grades: BTreeMap<u32, BTreeSet<String>>
 }
 
 impl School {
 
     pub fn new() -> School {
         School {
-            grades: HashMap::new()
+            grades: BTreeMap::new()
         }
     }
 
     pub fn add(&mut self, grade: u32, student: &str) {
-        let mut ls = match self.grades.get(&grade) {
-            Some(ls) => ls.to_owned(),
-            None => vec!()
-        };
-        ls.push(student.to_string());
-        self.grades.insert(grade, ls);
+        self.grades.entry(grade)
+            .or_insert(BTreeSet::new())
+            .insert(student.to_string());
     }
 
     pub fn grades(&self) -> Vec<u32> {
-        let mut grades:Vec<u32> = self.grades.keys().map(|g| g.clone()).collect();
-        grades.sort();
-        grades
+        self.grades.keys().cloned().collect()
     }
 
     // If `grade` returned a reference, `School` would be forced to keep a `Vec<String>`
@@ -39,12 +34,11 @@ impl School {
     // the internal structure can be completely arbitrary. The tradeoff is that some data
     // must be copied each time `grade` is called.
     pub fn grade(&self, grade: u32) -> Vec<String> {
-        let mut ls = match self.grades.get(&grade) {
-            Some(ls) => ls.clone(),
-            None => vec!()
-        };
-        ls.sort();
-        ls
+        self.grades.get(&grade)
+            .unwrap_or(&BTreeSet::new())
+            .into_iter()
+            .cloned()
+            .collect()
     }
 
 }
