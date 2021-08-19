@@ -1,4 +1,3 @@
-use crate::Frame::{Standard, Final};
 use crate::Error::GameComplete;
 
 #[derive(Debug, PartialEq)]
@@ -8,31 +7,41 @@ pub enum Error {
 }
 
 pub struct BowlingGame {
-    rolls: Vec<Frame>
+    rolls: Vec<Box<dyn Frame>>
 }
 
-enum Frame {
-    Standard(Option<u16>, Option<u16>),
-    Final(Option<u16>, Option<u16>, Option<u16>)
+trait Frame {
+
+    fn done(&self) -> bool;
+
 }
 
-impl Frame {
-    pub fn done(&self) -> bool {
-        match self {
-            Standard(Some(_), Some(_)) => true,
-            Final(Some(10), Some(10), Some(_)) => true,
-            Final(Some(10), Some(10), None) => false,
-            Final(Some(_), Some(_), None) => true,
-            _ => false
-        }
+struct Standard(Option<i32>, Option<i32>);
+
+impl Frame for Standard {
+
+    fn done(&self) -> bool {
+        todo!()
     }
+
 }
+
+struct Final(Option<i32>, Option<i32>, Option<i32>);
+
+impl Frame for Final {
+
+    fn done(&self) -> bool {
+        todo!()
+    }
+
+}
+
 
 impl BowlingGame {
 
     pub fn new() -> Self {
         BowlingGame {
-            rolls: vec!(Standard(None, None))
+            rolls: vec!(Box::new(Standard(None, None)))
         }
     }
 
@@ -44,6 +53,7 @@ impl BowlingGame {
         if self.done() {
             return Err(GameComplete)
         }
+
         Ok(())
     }
 
