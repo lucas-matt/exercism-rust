@@ -1,4 +1,5 @@
-use two_bucket::{solve, Bucket, BucketStats};
+use two_bucket::{solve, Bucket, BucketStats, State, BucketState};
+use std::hash::Hash;
 
 #[test]
 fn test_case_1() {

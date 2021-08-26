@@ -2,3 +2,6 @@
 edition = "2018"
 name = "two-bucket"
 version = "1.4.0"
+
+[dependencies]
+cached = "0.25.0"
