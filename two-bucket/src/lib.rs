@@ -52,6 +52,16 @@ impl State {
     }
 }
 
+#[derive(Copy, Clone, Hash, PartialEq, Eq, Debug)]
+enum ActionType {
+    Fill,
+    Empty,
+    Pour
+}
+
+#[derive(Copy, Clone, Hash, PartialEq, Eq, Debug)]
+struct Action(ActionType, Bucket, State);
+
 /// Solve the bucket problem
 pub fn solve(
     capacity_1: u8,
@@ -64,10 +74,7 @@ pub fn solve(
     let state = State {
         one, two, goal
     };
-    let mut solver = Solver {
-        space: HashSet::new()
-    };
-    match solver.solve(state) {
+    match do_solve(state) {
         Some((State, moves)) => {
             None
         }
@@ -87,69 +94,67 @@ fn init(bucket:Bucket, capacity:u8, starting: &Bucket) -> BucketState {
     }
 }
 
-enum Action {
-    Fill,
-    Empty,
-    Pour
-}
+fn do_solve(init:State) -> Option<(State, u8)> {
 
-struct Solver {
-    space: HashSet<State>
-}
+    let mut tried:HashSet<Action> = HashSet::new();
+    let mut actions:Vec<Action> = next_actions(init);
 
-impl Solver {
-    fn solve(&mut self, state: State) -> Option<(State, u8)> {
-        println!("{:?} {:?}", state.one, state.two);
+    while !actions.is_empty() {
 
-        // if we've hit this point before, back out
-        if self.space.contains(&state) {
-            return None;
+        let action = actions.remove(0);
+
+        // if we've hit this point before, skip
+        if tried.contains(&action) {
+            continue;
         }
-        self.space.insert(state);
+        tried.insert(action);
 
-        // base success case
+        let Action(action, bucket, state) = action;
+        let state = match action {
+            ActionType::Pour => pour(bucket, state),
+            ActionType::Fill => fill(bucket, state),
+            ActionType::Empty => empty(bucket, state),
+        };
+
         if state.complete() {
             return Some((state, 1))
         }
 
-        let actions = [
-            self.pour(Bucket::One, state),
-            self.pour(Bucket::Two, state),
-            self.empty(Bucket::One, state),
-            self.empty(Bucket::Two, state),
-            self.fill(Bucket::One, state),
-            self.fill(Bucket::Two, state)
-        ];
+        actions.append(&mut next_actions(state));
 
-        for action in actions {
-            if let Some((end_state, moves)) = action {
-                // unwind on success
-                return Some((end_state, moves + 1));
-            }
+    }
+
+    None
+}
+
+fn next_actions(state:State) -> Vec<Action> {
+    let mut actions = Vec::new();
+    for action in [ActionType::Fill, ActionType::Empty, ActionType::Pour] {
+        for bucket in [Bucket::One, Bucket::Two] {
+            actions.push(Action(action, bucket, state))
         }
-
-        None
     }
+    actions
+}
 
-    fn pour(&mut self, bucket: Bucket, mut state: State) -> Option<(State, u8)> {
-        let (primary, secondary) = state.mut_buckets(bucket);
-        let mv = min(secondary.available(), primary.volume);
-        primary.volume -= mv;
-        secondary.volume += mv;
-        self.solve(state)
-    }
+fn pour(bucket: Bucket, mut state: State) -> State {
+    let (primary, secondary) = state.mut_buckets(bucket);
+    let mv = min(secondary.available(), primary.volume);
+    primary.volume -= mv;
+    secondary.volume += mv;
+    state
+}
 
-    fn empty(&mut self, bucket: Bucket, mut state: State) -> Option<(State, u8)> {
-        let (primary, _) = state.mut_buckets(bucket);
-        primary.volume = 0;
-        self.solve(state)
-    }
+fn empty(bucket: Bucket, mut state: State) -> State {
+    let (primary, _) = state.mut_buckets(bucket);
+    primary.volume = 0;
+    state
+}
 
-    fn fill(&mut self, bucket: Bucket, mut state: State) -> Option<(State, u8)> {
-        let (primary, _) = state.mut_buckets(bucket);
-        primary.volume = primary.capacity;
-        self.solve(state)
-    }
+fn fill(bucket: Bucket, mut state: State) -> State {
+    let (primary, _) = state.mut_buckets(bucket);
+    primary.volume = primary.capacity;
+    state
 }
 
 
