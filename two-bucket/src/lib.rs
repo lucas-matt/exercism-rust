@@ -21,22 +21,31 @@ pub struct BucketStats {
 
 #[derive(Hash, PartialEq, Eq, Clone, Copy, Debug)]
 pub struct BucketState {
-    pub bucket: Bucket,
-    pub capacity: u8,
-    pub volume: u8
+    bucket: Bucket,
+    capacity: u8,
+    volume: u8
 }
 
 impl BucketState {
     fn available(&self) -> u8 {
         self.capacity - self.volume
     }
+
+    fn is_full(&self) -> bool {
+        self.volume == self.capacity
+    }
+
+    fn is_empty(&self) -> bool {
+        self.volume == 0
+    }
 }
 
 #[derive(Hash, PartialEq, Eq, Clone, Copy, Debug)]
 pub struct State {
-    pub one: BucketState,
-    pub two: BucketState,
-    pub goal: u8
+    one: BucketState,
+    two: BucketState,
+    goal: u8,
+    init: Bucket
 }
 
 impl State {
@@ -49,6 +58,22 @@ impl State {
             Bucket::One => (&mut self.one, &mut self.two),
             Bucket::Two => (&mut self.two, &mut self.one)
         }
+    }
+
+    fn result(&self) -> (Bucket, u8) {
+        if self.one.volume == self.goal {
+            (Bucket::One, self.two.volume)
+        } else {
+            (Bucket::Two, self.one.volume)
+        }
+    }
+
+    fn allowed(&self) -> bool {
+        let (primary, secondary) = match self.init {
+            Bucket::One => (&self.one, &self.two),
+            Bucket::Two => (&self.two, &self.one)
+        };
+        !(secondary.is_full() && primary.is_empty())
     }
 }
 
@@ -72,11 +97,16 @@ pub fn solve(
     let one = init(Bucket::One, capacity_1, start_bucket);
     let two = init(Bucket::Two, capacity_2, start_bucket);
     let state = State {
-        one, two, goal
+        one, two, goal, init: *start_bucket
     };
     match do_solve(state) {
-        Some((State, moves)) => {
-            None
+        Some((state, moves)) => {
+            let (bucket, other) = state.result();
+            Some(BucketStats {
+                goal_bucket: bucket,
+                other_bucket: other,
+                moves
+            })
         }
         _ => None
     }
@@ -97,41 +127,41 @@ fn init(bucket:Bucket, capacity:u8, starting: &Bucket) -> BucketState {
 fn do_solve(init:State) -> Option<(State, u8)> {
 
     let mut tried:HashSet<Action> = HashSet::new();
-    let mut actions:Vec<Action> = next_actions(init);
+    let mut actions:Vec<(Action, u8)> = next_actions(init, 1);
 
     while !actions.is_empty() {
 
-        let action = actions.remove(0);
+        let (next_action, moves) = actions.remove(0);
+        let Action(action, bucket, state) = next_action;
 
-        // if we've hit this point before, skip
-        if tried.contains(&action) {
+        // if we've hit this point before or state not allowed
+        if tried.contains(&next_action) || !state.allowed() {
             continue;
         }
-        tried.insert(action);
+        tried.insert(next_action);
 
-        let Action(action, bucket, state) = action;
+        if state.complete() {
+            return Some((state, moves))
+        }
+
         let state = match action {
             ActionType::Pour => pour(bucket, state),
             ActionType::Fill => fill(bucket, state),
             ActionType::Empty => empty(bucket, state),
         };
 
-        if state.complete() {
-            return Some((state, 1))
-        }
-
-        actions.append(&mut next_actions(state));
+        actions.append(&mut next_actions(state, moves + 1));
 
     }
 
     None
 }
 
-fn next_actions(state:State) -> Vec<Action> {
+fn next_actions(state:State, moves:u8) -> Vec<(Action, u8)> {
     let mut actions = Vec::new();
     for action in [ActionType::Fill, ActionType::Empty, ActionType::Pour] {
         for bucket in [Bucket::One, Bucket::Two] {
-            actions.push(Action(action, bucket, state))
+            actions.push((Action(action, bucket, state), moves))
         }
     }
     actions
