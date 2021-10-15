@@ -1,21 +1,21 @@
 use crate::Rank::{ONE, THREE, FOUR, TWO, FIVE, EIGHT, QUEEN, KING, SIX, SEVEN, NINE, TEN, JACK};
 use crate::Suit::{HEARTS, SPADES, DIAMONDS, CLUBS};
 
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 enum Rank {
-    ONE,
-    TWO,
-    THREE,
-    FOUR,
-    FIVE,
-    SIX,
-    SEVEN,
-    EIGHT,
-    NINE,
-    TEN,
-    JACK,
-    QUEEN,
-    KING
+    ONE = 1,
+    TWO = 2,
+    THREE = 3,
+    FOUR = 4,
+    FIVE = 5,
+    SIX = 6,
+    SEVEN = 7,
+    EIGHT = 8,
+    NINE = 9,
+    TEN = 10,
+    JACK = 11,
+    QUEEN = 12,
+    KING = 13
 }
 
 impl Rank {
@@ -73,8 +73,17 @@ struct Hand<'a> {
 
 impl<'a> Hand<'a> {
     fn score(&self) -> u32 {
-        0
+        match &self.cards {
+            cards => highest(cards)
+        }
     }
+
+}
+
+fn highest(cards: &Vec<Card>) -> u32 {
+    cards.iter()
+        .map(|card| *(&card.rank) as u32)
+        .sum()
 }
 
 /// Given a list of poker hands, return a list of those hands which win.

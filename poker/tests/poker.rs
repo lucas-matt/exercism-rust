@@ -30,7 +30,6 @@ fn test_duplicate_hands_always_tie() {
 }
 
 #[test]
-#[ignore]
 fn test_highest_card_of_all_hands_wins() {
     test(
         &["4D 5S 6S 8D 3C", "2S 4C 7S 9H 10H", "3S 4S 5D 6H JH"],
@@ -39,7 +38,6 @@ fn test_highest_card_of_all_hands_wins() {
 }
 
 #[test]
-#[ignore]
 fn test_a_tie_has_multiple_winners() {
     test(
         &[
@@ -53,7 +51,6 @@ fn test_a_tie_has_multiple_winners() {
 }
 
 #[test]
-#[ignore]
 fn test_high_card_can_be_low_card_in_an_otherwise_tie() {
     // multiple hands with the same high cards, tie compares next highest ranked,
     // down to last card
