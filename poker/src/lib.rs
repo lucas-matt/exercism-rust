@@ -19,7 +19,7 @@ pub fn winning_hands<'a>(hands: &[&'a str]) -> Vec<&'a str> {
         .collect()
 }
 
-#[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 enum Rank {
     TWO = 2,
     THREE = 3,
@@ -57,7 +57,7 @@ impl Rank {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 enum Suit {
     HEARTS,
     SPADES,
@@ -90,7 +90,16 @@ struct Hand<'a> {
 }
 
 impl<'a> Hand<'a> {
-    fn score(&self) -> u32 {
+    fn score(&self) -> u64 {
+        if let Some(score) = score::flush(&self.cards) {
+            return score;
+        }
+        if let Some(score) = score::straight(&self.cards) {
+            return score;
+        }
+        if let Some(score) = score::four_of_a_kind(&self.cards) {
+            return score;
+        }
         if let Some(score) = score::three_of_a_kind(&self.cards) {
             return score;
         }
@@ -128,83 +137,145 @@ fn parse(input:&str) -> Option<Hand> {
 
 mod score {
 
-    use crate::Card;
+    use crate::{Card, Rank, Suit};
+    use std::collections::HashSet;
+
+    // score boost 11
+    pub fn flush(cards: &Vec<Card>) -> Option<u64> {
+        let is_flush = cards.iter()
+            .map(|card| card.suit)
+            .collect::<HashSet<Suit>>().len() == 1;
+        if !is_flush {
+            return None;
+        }
+        let score = cards.iter()
+            .map(|card| card.rank as u64 * 10_u64.pow(11))
+            .sum();
+        Some(score)
+    }
+
+    // score boost 10
+    pub fn straight(cards: &Vec<Card>) -> Option<u64> {
+        let mut cards:Vec<Rank> = cards.iter()
+            .map(|card| card.rank)
+            .collect();
+        cards.sort();
+        match cards.as_slice() {
+            // handle low ace
+            &[Rank::TWO, Rank::THREE, Rank::FOUR, Rank::FIVE, Rank::ACE] => Some(10_u64.pow(10)),
+            _ => {
+                let is_str = cards.windows(2)
+                    .all(|window| match window {
+                        &[x, y] if x as u32 == y as u32 - 1 => true,
+                        _ => false
+                    });
+                if is_str {
+                    Some(cards.into_iter()
+                        .map(|rank| rank as u64)
+                        .sum::<u64>() * 10_u64.pow(10))
+                } else {
+                    None
+                }
+            }
+        }
+    }
+
+    // score boost 10^9
+    pub fn four_of_a_kind(cards: &Vec<Card>) -> Option<u64> {
+        group_score(cards, 4, 1, 9)
+    }
 
     // score boost 10^7
-    pub fn three_of_a_kind(cards: &Vec<Card>) -> Option<u32> {
-        let mut cards = cards.clone();
-        cards.sort_by_key(|card| card.rank);
-        let three = cards.windows(3)
-            .filter(|&window| {
-                match window {
-                    &[a, b, c] if a.rank == b.rank && b.rank == c.rank => true,
-                    _ => false
-                }
-            })
-            .last();
-        three
-            .map(|cards| cards.iter().map(|card| card.rank as u32).sum::<u32>())
-            .map(|score| score * 10_u32.pow(7))
+    pub fn three_of_a_kind(cards: &Vec<Card>) -> Option<u64> {
+        group_score(cards, 3, 1, 7)
     }
 
     // score boost 10^6
-    pub fn two_pair(cards: &Vec<Card>) -> Option<u32> {
-        if let (Some(pairs), remainder) = find_pairs(cards) {
-            if pairs.len() == 2  {
-                let score:u32 = pairs.iter()
-                    .map(|pair| pair.0.rank as u32 * 10_u32.pow(6))
-                    .chain(remainder.iter().map(|card| card.rank as u32))
-                    .sum();
-                return Some(score)
-            }
-        }
-        return None
+    pub fn two_pair(cards: &Vec<Card>) -> Option<u64> {
+        group_score(cards, 2, 2, 6)
     }
 
     // score boost 10^5
-    pub fn pair(cards: &Vec<Card>) -> Option<u32> {
-        if let (Some(pairs), _) = find_pairs(cards) {
-            if let Some(first) = pairs.first() {
-                let rank = first.0.rank as u32;
-                return Some(rank * 10_u32.pow(5));
-            }
-        }
-        return None
+    pub fn pair(cards: &Vec<Card>) -> Option<u64> {
+        group_score(cards, 2, 1, 5)
     }
 
     // score boost 10^0 through 10^4
-    pub fn highest(cards: &Vec<Card>) -> u32 {
-        let mut ranks:Vec<u32> = cards.iter()
-            .map(|card| *(&card.rank) as u32)
+    pub fn highest(cards: &Vec<Card>) -> u64 {
+        let mut ranks:Vec<u64> = cards.iter()
+            .map(|card| *(&card.rank) as u64)
             .collect();
         ranks.sort();
         ranks.into_iter().enumerate()
-            .map(|(i, rank)| rank * 10_u32.pow(i as u32))
+            .map(|(i, rank)| rank * 10_u64.pow(i as u32))
             .sum()
     }
 
-    /** 
-     * Returns a list of pairs, and a list of unpaired
-     */
-    fn find_pairs(cards: &Vec<Card>) -> (Option<Vec<(Card, Card)>>, Vec<Card>) {
-        let mut pairs:Vec<(Card, Card)> = Vec::new();
-        for i in 0..cards.len() {
-            for j in i+1..cards.len() {
-                if cards[i].rank == cards[j].rank {
-                    pairs.push((cards[i], cards[j]))
-                }
-            }
+    fn group_score(cards: &Vec<Card>, size:usize, count:usize, boost:u32) -> Option<u64> {
+        let mut cards:Vec<Rank> = cards.iter()
+            .map(|card| card.rank)
+            .collect();
+        cards.sort();
+        let in_group:Vec<Rank> = cards.windows(size)
+            .filter(|&window| window.iter()
+                .collect::<HashSet<&Rank>>()
+                .len() == 1
+            )
+            .map(|window| window.first().unwrap())
+            .cloned()
+            .collect();
+        let remainder:Vec<&Rank> = cards.iter()
+            .filter(|&rank| !in_group.contains(&rank))
+            .collect();
+        if in_group.len() != count {
+            return None
         }
-        if pairs.is_empty() {
-            return (None, cards.clone())
-        }
-        let paired: Vec<Card> = pairs.iter()
-                                        .flat_map(|(x, y)| vec!(*x, *y))
-                                        .collect();
-        let remainder = cards.iter().filter(|&card| !paired.contains(card)).cloned().collect();
-        return (Some(pairs), remainder)
+        let score = in_group
+            .iter()
+            .map(|rank| *rank as u64 * 10_u64.pow(boost))
+            .chain(remainder.iter().map(|&rank| *rank as u64))
+            .sum();
+        Some(score)
     }
 
 }
 
+
+mod scores {
+
+    trait Score {}
+
+    struct Highest {
+
+    }
+
+    struct Pair {
+
+    }
+
+    struct TwoPair {
+
+    }
+
+    struct ThreeOfAKind {
+
+    }
+
+    struct FourOfAKind {
+
+    }
+
+    struct Straight {
+
+    }
+
+    struct Flush {
+
+    }
+
+    struct FullHouse {
+
+    }
+
+}
 
