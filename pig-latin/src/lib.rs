@@ -23,9 +23,6 @@ fn split(word:String) -> (String, String) {
         if begins(&["qu"], &word) {
             return (word[2..].to_string(), format!("{}{}", end, word[..2].to_string()));
         }
-        if begins(&["y"], &word) {
-            
-        }
         end = format!("{}{}", end, word.remove(0));
     }
     (start, end)
