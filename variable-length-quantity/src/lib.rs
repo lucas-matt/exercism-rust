@@ -25,16 +25,19 @@ pub fn to_bytes(values: &[u32]) -> Vec<u8> {
 
 /// Given a stream of bytes, extract all numbers which are encoded in there.
 pub fn from_bytes(bytes: &[u8]) -> Result<Vec<u32>, Error> {
-    let response:Vec<u32> = partition(bytes)?
+    partition(bytes)?
         .iter()
         .map(|parts| {
             parts.into_iter()
-                .fold(0_u32, |acc, n| {
-                    (acc << 7) + (n & 0x7f) as u32
+                .fold(Ok(0_u32), |acc, n| {
+                    let base = acc?;
+                    if base & 0xfe_00_00_00 > 0 {
+                        return Err(Error::Overflow);
+                    }
+                    Ok((base << 7) + (n & 0x7f) as u32)
                 })
         })
-        .collect();
-    Ok(response)
+        .collect::<Result<Vec<u32>, Error>>()
 }
 
 fn partition(bytes: &[u8]) -> Result<Vec<Vec<u8>>, Error> {
@@ -43,10 +46,6 @@ fn partition(bytes: &[u8]) -> Result<Vec<Vec<u8>>, Error> {
     for byte in bytes {
         batch.push(*byte);
         if 0x80 & byte == 0 {
-            println!("{:?}", batch);
-            if batch.len() > 5 {
-                return Err(Error::Overflow);
-            }
             partitioned.push(batch);
             batch = Vec::new();
         }
